@@ -5,35 +5,53 @@ const Price = () => {
     const [currentPrice, setCurrentPrice] = useState(0)
     const [symbol, setSymbol] = useState("VXX")
     const [priceTime, setPriceTime] = useState(0)
+    const [secondPrice, setSecondPrice] = useState(0)
     let html = "";
 
-    const stringToHTML = function (str) {
-        var parser = new DOMParser();
-        var doc = parser.parseFromString(str, 'text/html');
-        return doc.body;
-    };
+    useEffect(() => {
+        const ws = new WebSocket('wss://ws.finnhub.io?token=c0teprv48v6r4maeq8ng')
 
-    const extractPrice = (htmlString) => {
-        let htmlObj = stringToHTML(htmlString)
-        let priceElement = htmlObj.getElementsByClassName("IsqQVc NprOob XcVN5d wT3VGc")[0]
-        let price = priceElement.innerText
+        ws.addEventListener('open', () => {
+            ws.send(JSON.stringify({'type':'subscribe', 'symbol': symbol}))
+            console.log('Subscribe sent')
+        })
 
-        return price
+        ws.addEventListener('message', (message) => {
+            const tradeData = JSON.parse(message.data)
+            if(tradeData.type === "trade"){
+                console.log(tradeData.data[0])
+                setPriceTime(tradeData.data[0]?.t)
+                setCurrentPrice(tradeData.data[0]?.p)
+            }else if(tradeData.type === "ping"){
+                console.log("Ping!")
+            }else{
+                console.log(message)
+            }
+        })
+    }, [symbol])
+
+    const getPrice = () => {
+        axios.get(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=c0teprv48v6r4maeq8ng`)
+        .then(res => {
+            console.log(res.data?.c)
+            setSecondPrice(res.data?.c)
+        })
     }
 
-    axios.get(`http://localhost:8080/https://www.google.com/search?q=${symbol}`)
-        .then(res => {
-            setCurrentPrice(extractPrice(res.data))
-        })
-        .catch(err => {
-            console.log(err)
-        })
+    useEffect(() => {
+        setInterval(getPrice, 1067)
+    },[])
 
+    
+    
+
+    
+    
     return (
         <div>
             <p>Current Price of {symbol}: ${currentPrice}</p>
-            {/* <p>Time: {convertTime(priceTime)}</p> */}
-            {/* <div>{html}</div> */}
+            <p>Per second: ${secondPrice}</p>
+            <p>Time: {Date(priceTime)}</p>
         </div>
     )
 }
